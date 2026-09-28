@@ -1,0 +1,157 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-base-800 text-text-primary font-sans;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-base-700;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border-strong rounded-sm;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-tertiary;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3A4F6A #0F1520;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 bg-accent text-text-primary text-sm font-medium rounded transition-colors duration-fast hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-base-800 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-text-secondary text-sm font-medium rounded transition-colors duration-fast hover:bg-surface-2 hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-border-strong focus:ring-offset-1 focus:ring-offset-base-800;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 bg-status-critical text-white text-sm font-medium rounded transition-colors duration-fast hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-status-critical focus:ring-offset-2 focus:ring-offset-base-800;
+  }
+
+  .card {
+    @apply bg-surface-1 border border-border rounded-md shadow-sm;
+  }
+
+  .card-elevated {
+    @apply bg-surface-2 border border-border rounded-md shadow-md;
+  }
+
+  .input-field {
+    @apply w-full bg-surface-2 border border-border text-text-primary text-sm rounded px-3 py-1.5 placeholder:text-text-tertiary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors duration-fast;
+  }
+
+  .select-field {
+    @apply input-field appearance-none cursor-pointer;
+  }
+
+  .table-header {
+    @apply text-2xs font-semibold text-text-tertiary uppercase tracking-wider;
+  }
+
+  .table-cell {
+    @apply text-sm text-text-primary py-2.5 px-3;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary rounded transition-colors duration-fast hover:bg-surface-2 hover:text-text-primary cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-2.5 px-3 py-2 text-sm text-text-primary bg-surface-3 rounded font-medium;
+  }
+
+  .section-label {
+    @apply text-2xs font-semibold text-text-tertiary uppercase tracking-widest px-3 py-1.5;
+  }
+
+  .kpi-value {
+    @apply text-3xl font-bold text-text-primary tabular-nums;
+  }
+
+  .kpi-label {
+    @apply text-xs text-text-secondary uppercase tracking-wider;
+  }
+
+  .status-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full flex-shrink-0;
+  }
+
+  .divider {
+    @apply border-t border-border;
+  }
+
+  .page-header {
+    @apply flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1;
+  }
+
+  .page-title {
+    @apply text-lg font-semibold text-text-primary tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-xs text-text-secondary mt-0.5;
+  }
+}
+
+/* React Flow overrides */
+.react-flow__background {
+  background-color: #0B0F1A !important;
+}
+
+.react-flow__minimap {
+  background-color: #111827 !important;
+  border: 1px solid #2A3A52 !important;
+  border-radius: 4px !important;
+}
+
+.react-flow__controls {
+  background-color: #1A2235 !important;
+  border: 1px solid #2A3A52 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+
+.react-flow__controls-button {
+  background-color: #1A2235 !important;
+  border-bottom: 1px solid #2A3A52 !important;
+  color: #8FA3BF !important;
+  fill: #8FA3BF !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: #1F2D45 !important;
+}
+
+.react-flow__edge-path {
+  stroke-width: 1.5;
+}

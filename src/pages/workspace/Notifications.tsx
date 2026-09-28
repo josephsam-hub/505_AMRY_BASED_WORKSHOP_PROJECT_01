@@ -1,0 +1,18 @@
+import { useState } from 'react';
+import { AlertTriangle, Bell, Check, Factory } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { WorkspacePage, SummaryStrip } from './WorkspaceUI';
+import { useAppStore } from '../../store/useAppStore';
+import { formatDateTime } from '../../utils/dateUtils';
+
+type Category = 'all' | 'tasks' | 'inspections' | 'defects' | 'production';
+export default function WorkspaceNotifications() {
+  const { notifications, markNotificationRead, markAllRead } = useAppStore();
+  const [category, setCategory] = useState<Category>('all');
+  const navigate = useNavigate();
+  const relevant = notifications.filter((item) => !item.tankId || ['T-623', 'T-636', 'T-640', 'T-641', 'T-642', 'T-643', 'T-644'].includes(item.tankId));
+  const filtered = relevant.filter((item) => category === 'all' || (category === 'defects' && item.title.toLowerCase().includes('defect')) || (category === 'inspections' && item.title.toLowerCase().includes('inspection')) || (category === 'production' && (item.title.toLowerCase().includes('road') || item.title.toLowerCase().includes('manpower'))) || (category === 'tasks' && item.title.toLowerCase().includes('spares')));
+  const open = (item: typeof notifications[number]) => { markNotificationRead(item.id); if (item.title.toLowerCase().includes('defect') || item.title.toLowerCase().includes('failed')) navigate('/workspace/defects'); else if (item.title.toLowerCase().includes('inspection')) navigate('/workspace/inspections'); else if (item.tankId) navigate(`/admin/tanks/${item.tankId}`); };
+  const iconFor = (type: string) => type === 'alert' ? <AlertTriangle size={15} className="text-status-critical" /> : type === 'warning' ? <Bell size={15} className="text-status-warning" /> : type === 'success' ? <Check size={15} className="text-status-completed" /> : <Factory size={15} className="text-accent" />;
+  return <WorkspacePage title="Notifications" subtitle="Operational signals for your assigned work" action={<button className="btn-ghost" onClick={markAllRead}>Mark all as read</button>}><SummaryStrip items={[{ label: 'All', value: relevant.length }, { label: 'Unread', value: relevant.filter((item) => !item.read).length, tone: 'text-status-warning' }, { label: 'Critical', value: relevant.filter((item) => item.type === 'alert').length, tone: 'text-status-critical' }]} /><div className="flex flex-wrap gap-2">{(['all', 'tasks', 'inspections', 'defects', 'production'] as Category[]).map((item) => <button key={item} className={`btn-ghost text-xs uppercase ${category === item ? 'bg-surface-3 text-text-primary' : ''}`} onClick={() => setCategory(item)}>{item}</button>)}</div><div className="card divide-y divide-border">{filtered.length === 0 ? <div className="p-8 text-center text-sm text-text-tertiary">No notifications in this category.</div> : filtered.map((item) => <div key={item.id} className={`p-4 flex items-start gap-3 ${item.read ? '' : 'bg-surface-2/50'}`}><div className="mt-0.5">{iconFor(item.type)}</div><button className="flex-1 text-left" onClick={() => open(item)}><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-text-primary">{item.title}</span>{!item.read && <span className="status-dot bg-status-active" />}</div><div className="text-xs text-text-secondary mt-1">{item.message}</div><div className="text-2xs text-text-tertiary mt-2">{item.tankId ?? 'Workshop'} · {formatDateTime(item.createdAt)}</div></button>{!item.read && <button className="btn-ghost text-xs" onClick={() => markNotificationRead(item.id)}><Check size={12} />Read</button>}</div>)}</div></WorkspacePage>;
+}
