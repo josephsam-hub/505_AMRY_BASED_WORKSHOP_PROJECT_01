@@ -1,5 +1,8 @@
 import { io, type Socket } from 'socket.io-client';
 import { apiMode, runtimeConfig } from '../config/runtime';
+import { getDataMode } from '../config/dataMode';
+import { getAuthToken } from './api/client';
+import { useAppStore } from '../store/useAppStore';
 
 export type RealtimeStatus = 'connected' | 'reconnecting' | 'offline';
 export type OperationalEventName =
@@ -28,7 +31,7 @@ export type OperationalEventName =
 type Listener = (payload: Record<string, unknown>) => void;
 
 let socket: Socket | null = null;
-let status: RealtimeStatus = apiMode ? 'reconnecting' : 'offline';
+let status: RealtimeStatus = getDataMode() === 'SIMULATION' ? 'connected' : (apiMode ? 'reconnecting' : 'offline');
 const statusListeners = new Set<(nextStatus: RealtimeStatus) => void>();
 const eventListeners = new Map<OperationalEventName, Set<Listener>>();
 
@@ -37,13 +40,47 @@ function setStatus(nextStatus: RealtimeStatus) {
   statusListeners.forEach((listener) => listener(status));
 }
 
+// Window custom event listener for local simulation broadcasts
+if (typeof window !== 'undefined') {
+  window.addEventListener('workshop:refresh', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { eventName: OperationalEventName; payload: Record<string, unknown> } | undefined;
+    if (detail?.eventName) {
+      const listeners = eventListeners.get(detail.eventName);
+      listeners?.forEach((l) => l(detail.payload ?? {}));
+    }
+  });
+}
+
 function connect() {
+  const mode = getDataMode();
+  if (mode === 'SIMULATION') {
+    setStatus('connected');
+    return;
+  }
+
   if (!apiMode || socket) return;
-  socket = io(runtimeConfig.apiUrl, { withCredentials: true, autoConnect: true });
+
+  const role = useAppStore.getState().role;
+  const token = getAuthToken();
+
+  socket = io(runtimeConfig.apiUrl, {
+    auth: {
+      token,
+      role,
+      roles: role === 'admin' ? ['ADMIN', 'USER'] : ['USER'],
+      gangIds: role === 'admin'
+        ? ['G01', 'G02', 'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 'G10']
+        : ['G07', 'G08'],
+    },
+    withCredentials: true,
+    autoConnect: true,
+  });
+
   socket.on('connect', () => setStatus('connected'));
   socket.on('disconnect', () => setStatus('offline'));
   socket.io.on('reconnect_attempt', () => setStatus('reconnecting'));
   socket.io.on('reconnect', () => setStatus('connected'));
+
   socket.onAny((eventName: string, payload: Record<string, unknown>) => {
     const listeners = eventListeners.get(eventName as OperationalEventName);
     listeners?.forEach((listener) => listener(payload));
@@ -69,5 +106,7 @@ export function subscribeRealtime(eventName: OperationalEventName, listener: Lis
   listeners.add(listener);
   eventListeners.set(eventName, listeners);
   connect();
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

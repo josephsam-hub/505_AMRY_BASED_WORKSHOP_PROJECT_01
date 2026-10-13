@@ -2,7 +2,7 @@ import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 import { env } from './config/env.js';
 import { query, withTransaction } from './db/pool.js';
-import { authenticateRequest, requireRole } from './middleware/auth.js';
+import { authenticateRequest, requireRole, createToken } from './middleware/auth.js';
 import { emitOperationalEvent } from './realtime/events.js';
 
 export const app = express();
@@ -41,6 +41,16 @@ app.get('/api/data-quality', async (_request, response) => {
       b.invalid_rows, b.ambiguous_rows, b.inserted_rows, b.updated_rows, b.skipped_rows, b.error_count
     ORDER BY d.created_at DESC`);
   response.json(result.rows);
+});
+
+app.post('/api/auth/login', (request, response) => {
+  const { username, role } = request.body ?? {};
+  const requestedRole = (role ?? (username === 'admin' ? 'admin' : 'user')).toLowerCase();
+  const authUser = requestedRole === 'admin'
+    ? { id: 'USR-ADMIN', roles: ['ADMIN', 'USER'], gangIds: ['G01', 'G02', 'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 'G10'] }
+    : { id: 'USR-GANG-GH', roles: ['USER'], gangIds: ['G07', 'G08'] };
+  const token = createToken(authUser);
+  response.json({ token, user: authUser });
 });
 
 app.get('/api/auth/context', (request, response) => {
@@ -117,7 +127,15 @@ app.patch('/api/tank-processes/:id', requireOperationalRole, async (request, res
   emitOperationalEvent('process.updated', { tankId: tankProcess.tank_id, processId: tankProcess.process_id, status: tankProcess.status, progress: tankProcess.progress });
   response.json(result.rows[0]);
 });
-app.get('/api/bays', async (_request, response) => response.json((await query('SELECT * FROM bays ORDER BY number')).rows));
+app.get('/api/bays', async (_request, response) => response.json((await query(`
+  SELECT b.*,
+    COALESCE(json_agg(t.id) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS current_tank_ids,
+    COUNT(t.id)::int AS occupied_count
+  FROM bays b
+  LEFT JOIN tanks t ON t.bay_id = b.id
+  GROUP BY b.id
+  ORDER BY b.number
+`)).rows));
 app.get('/api/stages', async (_request, response) => response.json((await query('SELECT * FROM stages ORDER BY number')).rows));
 app.get('/api/bays/:id', async (request, response) => response.json((await query('SELECT * FROM bays WHERE id = $1', [request.params.id])).rows[0] ?? null));
 app.get('/api/gangs', async (_request, response) => response.json((await query('SELECT * FROM gangs ORDER BY name')).rows));
@@ -298,6 +316,7 @@ app.get('/api/reports/defects', async (_request, response) => response.json((awa
 app.get('/api/reports/inspections', async (_request, response) => response.json((await query('SELECT status, COUNT(*)::int AS count FROM inspections GROUP BY status ORDER BY status')).rows));
 
 app.use((error: Error, _request: Request, response: Response, _next: unknown) => {
-  console.error(error);
+  // Structured error log — never interpolate user input directly
+  console.error(JSON.stringify({ event: 'server_error', message: error.message, stack: error.stack?.split('\n')[0] }));
   response.status(500).json({ error: 'Workshop server error' });
 });

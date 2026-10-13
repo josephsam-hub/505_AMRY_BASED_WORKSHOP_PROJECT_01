@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { Plus, Activity } from 'lucide-react';
 import { WorkspacePage, SummaryStrip, Modal, UpdateMeta } from './WorkspaceUI';
-import { useWorkspaceData } from './workspaceData';
-import { processService } from '../../services/api/processService';
+import { CURRENT_USER, useWorkspaceData } from './workspaceData';
+import { useAppStore } from '../../store/useAppStore';
 import type { ProcessStatus } from '../../models';
+
+import { processService } from '../../services/api/processService';
 
 const reasons = ['Material unavailable', 'Manpower shortage', 'Inspection pending', 'Defect found', 'Equipment issue', 'Other'];
 export default function ProcessUpdates() {
   const { tanks, processes, updates } = useWorkspaceData();
+  const addProcessUpdate = useAppStore((state) => state.addProcessUpdate);
   const [open, setOpen] = useState(false);
   const [tankId, setTankId] = useState(tanks[0]?.id ?? '');
   const [processId, setProcessId] = useState(tanks[0]?.currentProcessId ?? '');
@@ -17,7 +20,39 @@ export default function ProcessUpdates() {
   const [delayReason, setDelayReason] = useState('');
   const selectedTank = tanks.find((tank) => tank.id === tankId);
   const relevantUpdates = updates.map((update) => ({ ...update, tank: tanks.find((tank) => tank.id === update.tankId), process: processes.find((process) => process.id === update.processId) }));
-  const save = () => { if (!tankId || !processId) return; void processService.createUpdate({ tankId, processId, progress: Math.max(0, Math.min(100, Number(progress))), status, remarks, delayReason: delayReason || undefined }).then(() => { window.dispatchEvent(new CustomEvent('workshop:refresh')); setOpen(false); setRemarks(''); setDelayReason(''); }); };
+  
+  const save = async () => {
+    if (!tankId || !processId) return;
+    const numProg = Math.max(0, Math.min(100, Number(progress)));
+    try {
+      await processService.createUpdate({
+        tankId,
+        processId,
+        progress: numProg,
+        status,
+        remarks: remarks || undefined,
+        delayReason: delayReason || undefined,
+      });
+      addProcessUpdate({
+        id: `PU-${Date.now()}`,
+        tankId,
+        processId,
+        previousStatus: selectedTank?.status === 'critical' ? 'blocked' : 'active',
+        currentStatus: status,
+        progress: numProg,
+        updatedBy: CURRENT_USER.name,
+        updatedAt: new Date().toISOString(),
+        remarks,
+        delayReason: delayReason || undefined,
+      });
+      setOpen(false);
+      setRemarks('');
+      setDelayReason('');
+      window.dispatchEvent(new CustomEvent('workshop:refresh', { detail: { eventName: 'production.updated' } }));
+    } catch (err) {
+      console.error('Error saving process update:', err);
+    }
+  };
   return <WorkspacePage title="Process Updates" subtitle="Record what changed in your work" action={<button className="btn-primary" onClick={() => setOpen(true)}><Plus size={14} />Add update</button>}>
     <SummaryStrip items={[{ label: 'Updates recorded', value: relevantUpdates.length }, { label: 'Active', value: relevantUpdates.filter((item) => item.currentStatus === 'active').length, tone: 'text-status-active' }, { label: 'Delayed', value: relevantUpdates.filter((item) => item.currentStatus === 'delayed').length, tone: 'text-status-warning' }, { label: 'Blocked', value: relevantUpdates.filter((item) => item.currentStatus === 'blocked').length, tone: 'text-status-critical' }]} />
     <div className="card"><div className="px-4 py-3 border-b border-border flex items-center gap-2"><Activity size={14} className="text-accent" /><h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Recent Updates</h2></div>{relevantUpdates.length === 0 ? <div className="p-8 text-center text-sm text-text-tertiary">No updates recorded for your tanks yet.</div> : <div className="divide-y divide-border">{relevantUpdates.map((update) => <div key={update.id} className="p-4 grid grid-cols-1 md:grid-cols-[1fr_1.5fr_auto] gap-2 items-center"><div><div className="font-mono text-sm text-text-primary">T-{update.tank?.tankNumber}</div><div className="text-2xs text-text-tertiary">{update.tank?.ohNumber}</div></div><div><div className="text-sm text-text-primary">{update.process?.name}</div><div className="text-2xs text-text-secondary">{update.previousStatus} → <span className="text-text-primary">{update.currentStatus}</span> · {update.progress}% · {update.remarks || 'No remarks'}</div></div><div className="text-right"><div className="text-xs text-text-secondary">{update.updatedBy}</div><UpdateMeta timestamp={update.updatedAt} /></div></div>)}</div>}</div>

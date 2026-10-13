@@ -1,8 +1,25 @@
-import { Bell, Shield, User, ChevronDown } from 'lucide-react';
+import { Bell, Shield, User, ChevronDown, Search } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ConnectionStatus } from './ConnectionStatus';
+import { openCommandPalette } from './CommandPalette';
+
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const date = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return (
+    <div className="flex flex-col items-end">
+      <span className="text-xs font-mono text-text-primary tabular-nums">{time}</span>
+      <span className="text-2xs text-text-tertiary">{date}</span>
+    </div>
+  );
+}
 
 export function CommandHeader() {
   const { role, setRole, notifications } = useAppStore();
@@ -17,20 +34,37 @@ export function CommandHeader() {
   };
 
   return (
-    <header className="h-14 flex items-center justify-between px-6 border-b border-border bg-surface-1 flex-shrink-0">
+    <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-surface-1 flex-shrink-0 gap-3">
       {/* Left: context label */}
-      <div className="flex items-center gap-3">
-        <div className="text-xs text-text-tertiary uppercase tracking-widest">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="text-xs text-text-tertiary uppercase tracking-widest whitespace-nowrap">
           {role === 'admin' ? 'Command Center' : 'Workstation'}
         </div>
-        <div className="w-px h-4 bg-border" />
-        <div className="text-xs text-text-secondary">
+        <div className="w-px h-4 bg-border flex-shrink-0" />
+        <div className="text-xs text-text-secondary truncate">
           505 Base Workshop — Tank Overhaul Management
         </div>
       </div>
 
       {/* Right: controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Ctrl+K search */}
+        <button
+          className="btn-ghost flex items-center gap-2 text-xs text-text-tertiary"
+          onClick={openCommandPalette}
+          title="Command Palette (Ctrl+K)"
+        >
+          <Search size={13} />
+          <span className="hidden md:inline">Search</span>
+          <kbd className="hidden md:inline text-2xs border border-border rounded px-1 py-0.5">Ctrl+K</kbd>
+        </button>
+
+        <div className="w-px h-4 bg-border" />
+
+        <LiveClock />
+
+        <div className="w-px h-4 bg-border" />
+
         <ConnectionStatus />
 
         {/* Notification bell */}

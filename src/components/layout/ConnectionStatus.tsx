@@ -3,9 +3,9 @@ import { Cloud, CloudOff, LoaderCircle } from 'lucide-react';
 import { getRealtimeStatus, subscribeRealtimeStatus, type RealtimeStatus } from '../../services/realtime';
 
 const labels: Record<RealtimeStatus, string> = {
-  connected: 'Connected',
-  offline: 'Realtime disconnected',
-  reconnecting: 'Reconnecting...',
+  connected: '● LIVE',
+  offline: '● OFFLINE',
+  reconnecting: '● RECONNECTING',
 };
 
 export function ConnectionStatus() {

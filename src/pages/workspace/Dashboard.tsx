@@ -29,9 +29,45 @@ export default function UserDashboard() {
   return (
     <div className="p-6 flex flex-col gap-6">
       {/* Header */}
-      <div>
-        <h1 className="page-title">My Workspace</h1>
-        <p className="page-subtitle">{today} · Authenticated operational assignments</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="page-title">MY WORKSTATION — EXECUTION</h1>
+          <p className="page-subtitle">{today} · Gang G — Semi-Final Assembly / Gang H — Electrical</p>
+        </div>
+
+        {/* Quick Execution Actions Bar */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            className="btn-secondary text-xs font-bold uppercase tracking-wider"
+            onClick={() => navigate('/workspace/process-updates')}
+          >
+            Start Process
+          </button>
+          <button
+            className="btn-primary text-xs font-bold uppercase tracking-wider"
+            onClick={() => navigate('/workspace/process-updates')}
+          >
+            Update Progress
+          </button>
+          <button
+            className="btn-secondary text-xs font-bold uppercase tracking-wider"
+            onClick={() => navigate('/workspace/inspections')}
+          >
+            Request Inspection
+          </button>
+          <button
+            className="btn-danger text-xs font-bold uppercase tracking-wider"
+            onClick={() => navigate('/workspace/defects')}
+          >
+            Report Defect
+          </button>
+          <button
+            className="btn-success text-xs font-bold uppercase tracking-wider"
+            onClick={() => navigate('/workspace/process-updates')}
+          >
+            Complete Process
+          </button>
+        </div>
       </div>
 
       {/* Alerts banner */}
@@ -58,7 +94,6 @@ export default function UserDashboard() {
           <div className="card p-4 cursor-pointer" onClick={() => navigate('/workspace/tasks')}>
             <SectionHeader icon={ListTodo} title="Today's Tasks" count={myTasks.length} />
             <div className="flex flex-col gap-3">
-              {myTanks.length === 0 && <div className="text-sm text-text-tertiary py-2">No active assignments.</div>}
               {myTasks.map(({ tank, process, stage }) => (
                 <div
                   key={tank.id}

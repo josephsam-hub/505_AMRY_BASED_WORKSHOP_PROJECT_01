@@ -5,9 +5,7 @@
 @tailwind utilities;
 
 @layer base {
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
+  *, *::before, *::after { box-sizing: border-box; }
 
   html {
     font-size: 14px;
@@ -17,91 +15,104 @@
 
   body {
     @apply bg-base-800 text-text-primary font-sans;
-    margin: 0;
-    padding: 0;
-    min-height: 100vh;
+    margin: 0; padding: 0; min-height: 100vh;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    @apply bg-base-700;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-border-strong rounded-sm;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-text-tertiary;
-  }
-
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #3A4F6A #0F1520;
-  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #0D1117; }
+  ::-webkit-scrollbar-thumb { background: #344560; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #526070; }
+  * { scrollbar-width: thin; scrollbar-color: #344560 #0D1117; }
 }
 
 @layer components {
+  /* ── Buttons ── */
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 bg-accent text-text-primary text-sm font-medium rounded transition-colors duration-fast hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-base-800 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-white text-sm font-semibold rounded
+      transition-all duration-fast
+      focus:outline-none focus:ring-2 focus:ring-army-light focus:ring-offset-2 focus:ring-offset-base-800
+      disabled:opacity-40 disabled:cursor-not-allowed;
+    background: linear-gradient(to right, #414d0b, #727a17);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(to right, #4e5c0d, #848f1c);
+    box-shadow: 0 2px 8px rgba(114, 122, 23, 0.3);
   }
 
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 text-text-secondary text-sm font-medium rounded transition-colors duration-fast hover:bg-surface-2 hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-border-strong focus:ring-offset-1 focus:ring-offset-base-800;
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-text-secondary text-sm font-medium rounded
+      transition-colors duration-fast hover:bg-surface-2 hover:text-text-primary
+      focus:outline-none focus:ring-2 focus:ring-border-strong focus:ring-offset-1 focus:ring-offset-base-800;
   }
 
   .btn-danger {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 bg-status-critical text-white text-sm font-medium rounded transition-colors duration-fast hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-status-critical focus:ring-offset-2 focus:ring-offset-base-800;
+    @apply inline-flex items-center gap-2 px-3 py-1.5 bg-status-critical text-white text-sm font-medium rounded
+      transition-colors duration-fast hover:bg-red-700
+      focus:outline-none focus:ring-2 focus:ring-status-critical focus:ring-offset-2 focus:ring-offset-base-800;
   }
 
+  /* ── Cards ── */
   .card {
-    @apply bg-surface-1 border border-border rounded-md shadow-sm;
+    @apply bg-surface-1 border border-border rounded shadow-sm;
   }
 
   .card-elevated {
-    @apply bg-surface-2 border border-border rounded-md shadow-md;
+    @apply bg-surface-2 border border-border rounded shadow-md;
   }
 
+  /* ── Form controls ── */
   .input-field {
-    @apply w-full bg-surface-2 border border-border text-text-primary text-sm rounded px-3 py-1.5 placeholder:text-text-tertiary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors duration-fast;
+    @apply w-full bg-surface-2 border border-border text-text-primary text-sm rounded px-3 py-1.5
+      placeholder:text-text-tertiary
+      focus:outline-none focus:border-army-light focus:ring-1 focus:ring-army-light
+      transition-colors duration-fast;
   }
 
   .select-field {
     @apply input-field appearance-none cursor-pointer;
   }
 
+  /* ── Table ── */
   .table-header {
-    @apply text-2xs font-semibold text-text-tertiary uppercase tracking-wider;
+    @apply text-2xs font-bold text-text-tertiary uppercase tracking-wider;
+    letter-spacing: 0.08em;
   }
 
   .table-cell {
     @apply text-sm text-text-primary py-2.5 px-3;
   }
 
+  /* ── Navigation ── */
   .nav-item {
-    @apply flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary rounded transition-colors duration-fast hover:bg-surface-2 hover:text-text-primary cursor-pointer;
+    @apply flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary rounded
+      transition-colors duration-fast hover:bg-surface-2 hover:text-text-primary cursor-pointer;
   }
 
+  /* Active nav — exact army gradient with left accent bar */
   .nav-item-active {
-    @apply flex items-center gap-2.5 px-3 py-2 text-sm text-text-primary bg-surface-3 rounded font-medium;
+    @apply flex items-center gap-2.5 px-3 py-2 text-sm font-semibold rounded cursor-pointer;
+    color: #E8F0C0;
+    background: linear-gradient(to right, #414d0b, #2a3308);
+    border-left: 2px solid #727a17;
+    padding-left: 10px;
   }
 
   .section-label {
-    @apply text-2xs font-semibold text-text-tertiary uppercase tracking-widest px-3 py-1.5;
+    @apply text-2xs font-bold text-text-tertiary uppercase px-3 py-1;
+    letter-spacing: 0.14em;
   }
 
+  /* ── KPI ── */
   .kpi-value {
     @apply text-3xl font-bold text-text-primary tabular-nums;
   }
 
   .kpi-label {
-    @apply text-xs text-text-secondary uppercase tracking-wider;
+    @apply text-2xs font-bold text-text-tertiary uppercase;
+    letter-spacing: 0.1em;
   }
 
+  /* ── Misc ── */
   .status-dot {
     @apply inline-block w-1.5 h-1.5 rounded-full flex-shrink-0;
   }
@@ -119,37 +130,81 @@
   }
 
   .page-subtitle {
-    @apply text-xs text-text-secondary mt-0.5;
+    @apply text-xs text-text-tertiary mt-0.5;
+  }
+
+  /* ── Army gradient progress bar ── */
+  .progress-army {
+    background: linear-gradient(to right, #414d0b, #727a17);
+  }
+
+  /* ── Operational empty state ── */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 px-6 text-center;
+  }
+
+  .empty-state-title {
+    @apply text-sm font-bold text-text-secondary uppercase tracking-wider mt-3;
+    letter-spacing: 0.1em;
+  }
+
+  .empty-state-desc {
+    @apply text-xs text-text-tertiary mt-1.5 max-w-xs leading-relaxed;
+  }
+
+  .empty-state-source {
+    @apply text-2xs text-text-tertiary mt-3 opacity-50;
+  }
+
+  /* ── Data source indicator ── */
+  .data-source {
+    @apply inline-flex items-center gap-1.5 text-2xs text-text-tertiary;
   }
 }
 
-/* React Flow overrides */
+/* ── Army gradient utility (not in Tailwind JIT) ── */
+.bg-army-gradient {
+  background: linear-gradient(to right, #414d0b, #727a17);
+}
+
+.bg-army-gradient-135 {
+  background: linear-gradient(135deg, #414d0b, #727a17);
+}
+
+.text-army-gradient {
+  background: linear-gradient(to right, #414d0b, #727a17);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── React Flow overrides ── */
 .react-flow__background {
-  background-color: #0B0F1A !important;
+  background-color: #0A0D12 !important;
 }
 
 .react-flow__minimap {
-  background-color: #111827 !important;
-  border: 1px solid #2A3A52 !important;
+  background-color: #111620 !important;
+  border: 1px solid #263040 !important;
   border-radius: 4px !important;
 }
 
 .react-flow__controls {
-  background-color: #1A2235 !important;
-  border: 1px solid #2A3A52 !important;
+  background-color: #181E2A !important;
+  border: 1px solid #263040 !important;
   border-radius: 4px !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
 }
 
 .react-flow__controls-button {
-  background-color: #1A2235 !important;
-  border-bottom: 1px solid #2A3A52 !important;
-  color: #8FA3BF !important;
-  fill: #8FA3BF !important;
+  background-color: #181E2A !important;
+  border-bottom: 1px solid #263040 !important;
+  color: #8A9BB5 !important;
+  fill: #8A9BB5 !important;
 }
 
 .react-flow__controls-button:hover {
-  background-color: #1F2D45 !important;
+  background-color: #1D2535 !important;
 }
 
 .react-flow__edge-path {

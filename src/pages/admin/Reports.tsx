@@ -1,291 +1,321 @@
-import { useMemo, useState, useEffect } from 'react';
-import { Download, Filter, Gauge, AlertTriangle, ClipboardCheck, Users, Building2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
-import { KpiCard } from '../../components/ui/KpiCard';
-import type { Bay, Defect, Gang, Inspection, Stage, Tank } from '../../models';
-import { productionService } from '../../services/productionService';
-import { defectService } from '../../services/api/defectService';
-import { inspectionService } from '../../services/api/inspectionService';
+import { useEffect, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Download, BarChart3, AlertCircle } from 'lucide-react';
+import { apiRequest } from '../../services/api/client';
 import { resourceService } from '../../services/api/resourceService';
-import { apiMode } from '../../config/runtime';
+import { productionService } from '../../services/productionService';
+import type { Tank, Stage } from '../../models';
 
-const stageColors: Record<string, string> = {
-  S1: '#7C3AED',
-  S2: '#2563EB',
-  S3: '#0891B2',
-  S4: '#D97706',
-  S5: '#EA580C',
-  S6: '#16A34A',
+const TOOLTIP_STYLE = {
+  contentStyle: { background: '#181E2A', border: '1px solid #263040', borderRadius: 4, fontSize: 12 },
+  labelStyle: { color: '#8A9BB5' },
+  itemStyle: { color: '#DDE4EE' },
 };
 
-const pieColors = ['#EF4444', '#F59E0B', '#3B82F6', '#22C55E'];
+const STAGE_COLORS: Record<string, string> = {
+  S1: '#6B5B9E', S2: '#2A6090', S3: '#1E7A7A',
+  S4: '#8A6020', S5: '#8A4820', S6: '#2A7A40',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  COMPLETED: '#4A9E6A', IN_PROGRESS: '#3A7EC4', WARNING: '#C4882A',
+  CRITICAL: '#C44040', PENDING: '#445060',
+};
+
+interface ProductionRow { status: string; count: number; average_progress: number }
+interface DefectRow { severity: string; status: string; count: number }
+interface InspectionRow { status: string; count: number }
+interface GangRow { id: string; name: string; authorized: number; deployed: number; held: number }
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <div className="text-2xs font-bold text-text-tertiary uppercase tracking-wider mb-3" style={{ letterSpacing: '0.1em' }}>
+      {title}
+    </div>
+  );
+}
+
+function StatRow({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+      <span className="text-xs text-text-secondary">{label}</span>
+      <span className={`text-xs font-semibold tabular-nums ${accent ?? 'text-text-primary'}`}>{value}</span>
+    </div>
+  );
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="flex items-center justify-center h-32 text-xs text-text-tertiary">{message}</div>
+  );
+}
 
 export default function Reports() {
-  const [stageFilter, setStageFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [prodRows, setProdRows] = useState<ProductionRow[]>([]);
+  const [defectRows, setDefectRows] = useState<DefectRow[]>([]);
+  const [inspRows, setInspRows] = useState<InspectionRow[]>([]);
+  const [gangs, setGangs] = useState<GangRow[]>([]);
   const [tanks, setTanks] = useState<Tank[]>([]);
-  const [defects, setDefects] = useState<Defect[]>([]);
-  const [inspections, setInspections] = useState<Inspection[]>([]);
-  const [gangs, setGangs] = useState<Gang[]>([]);
-  const [bays, setBays] = useState<Bay[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([productionService.getTanks(), defectService.getDefects(), inspectionService.getInspections(), resourceService.getGangs(), resourceService.getBays(), resourceService.getStages()]).then(([nextTanks, nextDefects, nextInspections, nextGangs, nextBays, nextStages]) => {
-      setTanks(nextTanks);
-      setDefects(nextDefects);
-      setInspections(nextInspections);
-      setGangs(nextGangs);
-      setBays(nextBays);
-      setStages(nextStages);
-    });
+    setLoading(true);
+    Promise.all([
+      apiRequest<ProductionRow[]>('/api/reports/production'),
+      apiRequest<DefectRow[]>('/api/reports/defects'),
+      apiRequest<InspectionRow[]>('/api/reports/inspections'),
+      apiRequest<GangRow[]>('/api/gangs'),
+      productionService.getTanks(),
+      resourceService.getStages(),
+    ]).then(([prod, def, insp, g, t, s]) => {
+      setProdRows(prod);
+      setDefectRows(def);
+      setInspRows(insp);
+      setGangs(g);
+      setTanks(t);
+      setStages(s);
+      setLoading(false);
+    }).catch((e: Error) => { setError(e.message); setLoading(false); });
   }, []);
 
-  const filteredTanks = useMemo(() => tanks.filter((tank) => {
-    const matchStage = stageFilter === 'all' || tank.currentStageId === stageFilter;
-    const matchStatus = statusFilter === 'all' || tank.status === statusFilter;
-    return matchStage && matchStatus;
-  }), [tanks, stageFilter, statusFilter]);
+  // Derived data — all from API
+  const totalTanks = prodRows.reduce((s, r) => s + r.count, 0);
+  const completedCount = prodRows.find((r) => r.status === 'COMPLETED')?.count ?? 0;
+  const activeCount = prodRows.find((r) => r.status === 'IN_PROGRESS')?.count ?? 0;
+  const warningCount = prodRows.find((r) => r.status === 'WARNING')?.count ?? 0;
+  const criticalCount = prodRows.find((r) => r.status === 'CRITICAL')?.count ?? 0;
+  const pendingCount = prodRows.find((r) => r.status === 'PENDING')?.count ?? 0;
+  const avgProgress = prodRows.find((r) => r.status === 'IN_PROGRESS')?.average_progress ?? 0;
 
-  const stagePerformance = stages.map((stage) => {
-    const stageTanks = filteredTanks.filter((t) => t.currentStageId === stage.id);
-    const avgProgress = stageTanks.length
-      ? Math.round(stageTanks.reduce((sum, t) => sum + t.overallProgress, 0) / stageTanks.length)
-      : 0;
-    const active = stageTanks.filter((t) => t.status === 'active' || t.status === 'warning' || t.status === 'critical').length;
-    const delayed = stageTanks.filter((t) => t.delayDays > 0).length;
-    return {
-      stage: stage.shortName,
-      progress: avgProgress,
-      active,
-      delayed,
-      fill: stageColors[stage.id] ?? '#4B5563',
-    };
-  });
+  const totalInsp = inspRows.reduce((s, r) => s + r.count, 0);
+  const passedInsp = inspRows.find((r) => r.status === 'PASSED')?.count ?? 0;
+  const failedInsp = inspRows.find((r) => r.status === 'FAILED')?.count ?? 0;
+  const pendingInsp = inspRows.find((r) => r.status === 'PENDING')?.count ?? 0;
+  const passRate = totalInsp > 0 ? Math.round((passedInsp / (passedInsp + failedInsp || 1)) * 100) : 0;
 
-  const defectChart = [
-    { name: 'Critical', value: defects.filter((d) => d.severity === 'critical').length },
-    { name: 'Major', value: defects.filter((d) => d.severity === 'major').length },
-    { name: 'Minor', value: defects.filter((d) => d.severity === 'minor').length },
-  ];
+  const openDefects = defectRows.filter((d) => d.status === 'OPEN' || d.status === 'IN_PROGRESS').reduce((s, r) => s + r.count, 0);
+  const criticalDefects = defectRows.filter((d) => d.severity === 'CRITICAL').reduce((s, r) => s + r.count, 0);
 
-  const inspectionSummary = [
-    { name: 'Passed', value: inspections.filter((i) => i.status === 'passed').length },
-    { name: 'Pending', value: inspections.filter((i) => i.status === 'pending').length },
-    { name: 'In Progress', value: inspections.filter((i) => i.status === 'in-progress').length },
-    { name: 'Failed', value: inspections.filter((i) => i.status === 'failed').length },
-  ];
+  const totalAuthorized = gangs.reduce((s, g) => s + g.authorized, 0);
+  const totalDeployed = gangs.reduce((s, g) => s + g.deployed, 0);
+  const totalHeld = gangs.reduce((s, g) => s + g.held, 0);
 
-  const bayUtilization = bays.map((bay) => ({
-    bay: `B${bay.number}`,
-    utilization: bay.utilization,
+  // Chart data
+  const statusChartData = prodRows
+    .filter((r) => r.count > 0)
+    .map((r) => ({ name: r.status.replace('_', ' '), value: r.count, color: STATUS_COLORS[r.status] ?? '#445060' }));
+
+  const stageDistData = stages.map((s) => ({
+    name: `S${s.number}`,
+    label: s.shortName,
+    count: tanks.filter((t) => t.currentStageId === s.id).length,
+    color: STAGE_COLORS[s.id] ?? '#445060',
   }));
 
-  const manpowerUtilization = gangs.map((gang) => ({
-    gang: gang.name.split(' — ')[0],
-    deployed: gang.deployed,
-    authorized: gang.authorized,
-    utilization: gang.authorized > 0 ? Math.round((gang.deployed / gang.authorized) * 100) : 0,
+  const defectSeverityData = ['CRITICAL', 'MAJOR', 'MINOR'].map((sev) => ({
+    name: sev.charAt(0) + sev.slice(1).toLowerCase(),
+    value: defectRows.filter((d) => d.severity === sev).reduce((s, r) => s + r.count, 0),
+    color: sev === 'CRITICAL' ? '#C44040' : sev === 'MAJOR' ? '#C4882A' : '#3A7EC4',
+  })).filter((d) => d.value > 0);
+
+  const delayByStageData = stages.map((s) => ({
+    name: `S${s.number}`,
+    delayed: tanks.filter((t) => t.currentStageId === s.id && t.delayDays > 0).length,
+    onTime: tanks.filter((t) => t.currentStageId === s.id && t.delayDays === 0 && t.status !== 'pending').length,
   }));
 
-  const completionTrend: { name: string; completed: number }[] = [];
-
-  const kpis = {
-    totalTanks: filteredTanks.length,
-    active: filteredTanks.filter((t) => t.status === 'active').length,
-    completed: filteredTanks.filter((t) => t.status === 'completed').length,
-    critical: filteredTanks.filter((t) => t.status === 'critical').length,
-    avgProgress: filteredTanks.length
-      ? Math.round(filteredTanks.reduce((sum, t) => sum + t.overallProgress, 0) / filteredTanks.length)
-      : 0,
-    delayed: filteredTanks.filter((t) => t.delayDays > 0).length,
-  };
-
-  const exportReport = () => {
-    const rows = [
-      ['Metric', 'Value'],
-      ['Tanks', String(filteredTanks.length)],
-      ['Completed', String(kpis.completed)],
-      ['Critical', String(kpis.critical)],
-      ['Delayed', String(kpis.delayed)],
-      ['Open Defects', String(defects.filter((d) => d.status === 'open').length)],
-      ['Pending Inspections', String(inspections.filter((i) => i.status === 'pending').length)],
-    ];
-
-    const csv = rows.map((r) => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  function exportCSV() {
+    if (tanks.length === 0) return;
+    const headers = ['Tank', 'OH Number', 'Type', 'Profile', 'Stage', 'Status', 'Progress', 'Delay Days', 'Planned Completion'];
+    const rows = tanks.map((t) => {
+      const stage = stages.find((s) => s.id === t.currentStageId);
+      return [t.tankNumber, t.ohNumber, t.type, t.profile, stage?.shortName ?? '', t.status, t.overallProgress, t.delayDays, t.plannedCompletion ?? ''];
+    });
+    const csv = [headers, ...rows].map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'tank-production-report.csv';
-    link.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '505_workshop_production_report.csv';
+    a.click();
     URL.revokeObjectURL(url);
-  };
+  }
+
+  if (loading) return (
+    <div className="p-6 flex items-center justify-center h-64">
+      <span className="text-sm text-text-tertiary">Loading report data…</span>
+    </div>
+  );
 
   return (
     <div className="p-6 flex flex-col gap-5">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">Reports</h1>
-          <p className="page-subtitle">Production performance, quality and resource reporting</p>
+          <p className="page-subtitle">Production summary — Workshop PostgreSQL</p>
         </div>
-        <button className="btn-primary" onClick={exportReport}>
-          <Download size={13} /> Export Report
+        <button className="btn-primary" onClick={exportCSV} disabled={tanks.length === 0}>
+          <Download size={13} /> Export CSV
         </button>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 border border-border rounded px-2 py-1.5 bg-surface-1">
-          <Filter size={12} className="text-text-tertiary" />
-          <select className="select-field w-32 bg-transparent border-0 px-0 py-0" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
-            <option value="all">All stages</option>
-            {stages.map((stage) => (
-              <option key={stage.id} value={stage.id}>Stage {stage.number}</option>
-            ))}
-          </select>
+      {error && (
+        <div className="card p-3 flex items-center gap-2 text-xs text-status-critical bg-status-critical-bg border-status-critical-border">
+          <AlertCircle size={13} /> Database error: {error}
         </div>
-        <select className="select-field w-36" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="warning">At Risk</option>
-          <option value="critical">Critical</option>
-          <option value="completed">Completed</option>
-          <option value="pending">Pending</option>
-        </select>
-      </div>
+      )}
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <KpiCard label="Tank Fleet" value={kpis.totalTanks} icon={<Gauge size={14} />} />
-        <KpiCard label="Active" value={kpis.active} accent="active" />
-        <KpiCard label="Completed" value={kpis.completed} accent="completed" />
-        <KpiCard label="Critical" value={kpis.critical} accent="critical" />
-        <KpiCard label="Avg Progress" value={`${kpis.avgProgress}%`} accent="warning" />
-        <KpiCard label="Delayed" value={kpis.delayed} accent="warning" />
-      </div>
-      {apiMode && tanks.length === 0 && <div className="card p-5 text-sm text-text-tertiary">No verified production data available for reporting.</div>}
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Gauge size={13} className="text-accent" />
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Tank Completion Trend</span>
-          </div>
-          <div className="h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={completionTrend}>
-                <CartesianGrid stroke="#2A3A52" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#8FA3BF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#8FA3BF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="completed" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      {totalTanks === 0 && !error && (
+        <div className="card p-8 text-center">
+          <div className="text-sm font-semibold text-text-secondary uppercase tracking-wider">NO PRODUCTION DATA</div>
+          <div className="text-xs text-text-tertiary mt-2">No verified tank production records are currently available.</div>
+          <div className="text-2xs text-text-tertiary mt-1 opacity-60">Source: Workshop PostgreSQL</div>
         </div>
+      )}
 
-        <div className="card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle size={13} className="text-status-warning" />
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Defect Summary</span>
-          </div>
-          <div className="h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={defectChart} innerRadius={34} outerRadius={60} dataKey="value" nameKey="name" paddingAngle={2}>
-                  {defectChart.map((entry, idx) => (
-                    <Cell key={entry.name} fill={pieColors[idx % pieColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+      {totalTanks > 0 && (
+        <>
+          {/* Summary stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card p-4">
+              <SectionTitle title="Production Summary" />
+              <StatRow label="Total Tanks" value={totalTanks} />
+              <StatRow label="Completed" value={completedCount} accent="text-status-completed" />
+              <StatRow label="Active" value={activeCount} accent="text-status-active" />
+              <StatRow label="At Risk" value={warningCount} accent="text-status-warning" />
+              <StatRow label="Critical" value={criticalCount} accent="text-status-critical" />
+              <StatRow label="Pending" value={pendingCount} />
+              <StatRow label="Avg Progress (active)" value={activeCount > 0 ? `${Math.round(avgProgress)}%` : '—'} />
+            </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-            <Gauge size={13} className="text-accent" />
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Stage Performance</span>
-          </div>
-          <div className="divide-y divide-border">
-            {stagePerformance.map((item) => (
-              <div key={item.stage} className="px-4 py-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-text-primary">{item.stage}</span>
-                  <span className="text-xs text-text-tertiary">{item.progress}% avg</span>
-                </div>
-                <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${item.progress}%`, background: item.fill }} />
-                </div>
-                <div className="mt-2 flex items-center gap-4 text-2xs text-text-tertiary">
-                  <span>Active: {item.active}</span>
-                  <span>Delayed: {item.delayed}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+            <div className="card p-4">
+              <SectionTitle title="Quality Summary" />
+              <StatRow label="Total Inspections" value={totalInsp} />
+              <StatRow label="Passed" value={passedInsp} accent="text-status-completed" />
+              <StatRow label="Failed" value={failedInsp} accent="text-status-critical" />
+              <StatRow label="Pending" value={pendingInsp} />
+              <StatRow label="Pass Rate" value={totalInsp > 0 ? `${passRate}%` : '—'} accent={passRate >= 80 ? 'text-status-completed' : 'text-status-warning'} />
+              <StatRow label="Open Defects" value={openDefects} accent={openDefects > 0 ? 'text-status-warning' : 'text-text-primary'} />
+              <StatRow label="Critical Defects" value={criticalDefects} accent={criticalDefects > 0 ? 'text-status-critical' : 'text-text-primary'} />
+            </div>
 
-        <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-            <ClipboardCheck size={13} className="text-accent" />
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Inspection Summary</span>
-          </div>
-          <div className="p-4">
-            <div className="space-y-3">
-              {inspectionSummary.map((item) => (
-                <div key={item.name} className="flex items-center justify-between text-sm text-text-secondary">
-                  <span>{item.name}</span>
-                  <span className="font-semibold text-text-primary">{item.value}</span>
-                </div>
+            <div className="card p-4">
+              <SectionTitle title="Resource Summary" />
+              {gangs.length === 0 ? (
+                <div className="text-xs text-text-tertiary py-2">No verified gang records.</div>
+              ) : gangs.slice(0, 5).map((g) => (
+                <StatRow
+                  key={g.id}
+                  label={g.name.split('—')[0].trim()}
+                  value={g.authorized > 0 ? `${Math.round((g.deployed / g.authorized) * 100)}%` : '—'}
+                  accent={g.held > 0 ? 'text-status-warning' : 'text-status-active'}
+                />
               ))}
+              <StatRow label="Total Authorized" value={totalAuthorized} />
+              <StatRow label="Total Deployed" value={totalDeployed} accent="text-status-active" />
+              <StatRow label="Total Held" value={totalHeld} accent={totalHeld > 0 ? 'text-status-warning' : 'text-text-primary'} />
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Users size={13} className="text-accent" />
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Manpower Utilization</span>
-          </div>
-          <div className="space-y-3">
-            {manpowerUtilization.map((item) => (
-              <div key={item.gang}>
-                <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
-                  <span>{item.gang}</span>
-                  <span>{item.utilization}%</span>
+          {/* Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="card p-4">
+              <SectionTitle title="Tank Status Distribution" />
+              {statusChartData.length === 0 ? <EmptyChart message="No status data available." /> : (
+                <div className="flex items-center gap-4">
+                  <div style={{ width: 140, height: 140 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={statusChartData} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={2}>
+                          {statusChartData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip {...TOOLTIP_STYLE} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {statusChartData.map((d) => (
+                      <div key={d.name} className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.color }} />
+                        <span className="text-xs text-text-secondary">{d.name}</span>
+                        <span className="text-xs font-semibold text-text-primary ml-auto tabular-nums">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-status-active" style={{ width: `${item.utilization}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              )}
+            </div>
 
-        <div className="card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Building2 size={13} className="text-accent" />
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Bay Utilization</span>
+            <div className="card p-4">
+              <SectionTitle title="Stage Distribution" />
+              {stageDistData.every((d) => d.count === 0) ? <EmptyChart message="No tanks in production." /> : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={stageDistData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" tick={{ fill: '#526070', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#526070', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip {...TOOLTIP_STYLE} formatter={(v, _n, p) => [v, p.payload.label]} />
+                    <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+                      {stageDistData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </div>
-          <div className="space-y-3">
-            {bayUtilization.map((item) => (
-              <div key={item.bay}>
-                <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
-                  <span>{item.bay}</span>
-                  <span>{item.utilization}%</span>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="card p-4">
+              <SectionTitle title="Delay Analysis by Stage" />
+              {delayByStageData.every((d) => d.delayed === 0 && d.onTime === 0) ? <EmptyChart message="No delay data available." /> : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={delayByStageData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" tick={{ fill: '#526070', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#526070', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip {...TOOLTIP_STYLE} />
+                    <Bar dataKey="onTime" name="On Time" fill="#3A7EC4" radius={[2, 2, 0, 0]} stackId="a" />
+                    <Bar dataKey="delayed" name="Delayed" fill="#C44040" radius={[2, 2, 0, 0]} stackId="a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div className="card p-4">
+              <SectionTitle title="Defects by Severity" />
+              {defectSeverityData.length === 0 ? <EmptyChart message="No defect records available." /> : (
+                <div className="flex items-center gap-4">
+                  <div style={{ width: 120, height: 120 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={defectSeverityData} dataKey="value" cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3}>
+                          {defectSeverityData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip {...TOOLTIP_STYLE} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {defectSeverityData.map((d) => (
+                      <div key={d.name} className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.color }} />
+                        <span className="text-xs text-text-secondary">{d.name}</span>
+                        <span className="text-xs font-semibold text-text-primary ml-2 tabular-nums">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-status-warning" style={{ width: `${item.utilization}%` }} />
-                </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        </div>
+        </>
+      )}
+
+      <div className="flex items-center gap-2 p-3 bg-surface-2 border border-border rounded text-xs text-text-tertiary">
+        <BarChart3 size={13} className="text-accent flex-shrink-0" />
+        All data sourced from Workshop PostgreSQL. Export CSV downloads the current verified tank dataset.
       </div>
     </div>
   );

@@ -12,6 +12,7 @@
     "db:seed": "tsx server/src/db/seed.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "tsx tests/verify-phase8.ts",
     "preview": "vite preview"
   },
   "dependencies": {

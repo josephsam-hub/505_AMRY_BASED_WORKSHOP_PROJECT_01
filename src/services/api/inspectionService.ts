@@ -19,5 +19,7 @@ export const inspectionService = {
   getInspections: async () => (await apiRequest<InspectionRow[]>('/api/inspections')).map(mapInspection),
   getAssignedInspections: async () => (await apiRequest<InspectionRow[]>('/api/inspections?assignedToMe=true')).map(mapInspection),
   getInspectionById: async (id: string) => mapInspection(await apiRequest<InspectionRow>(`/api/inspections/${id}`)),
+  createInspection: async (data: { tankId: string; processId: string; stageId: string; name: string; scheduledDate: string }) =>
+    mapInspection(await apiRequest<InspectionRow>('/api/inspections', { method: 'POST', body: JSON.stringify(data) })),
   updateInspection: async (id: string, changes: { status?: InspectionStatus; inspector?: string; remarks?: string; completedDate?: string }) => mapInspection(await apiRequest<InspectionRow>(`/api/inspections/${id}`, { method: 'PATCH', body: JSON.stringify(changes) })),
 };
